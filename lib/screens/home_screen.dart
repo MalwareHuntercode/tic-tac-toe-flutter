@@ -1,6 +1,8 @@
 // lib/screens/home_screen.dart
 
 import 'package:flutter/material.dart';
+import '../widgets/score_card.dart';
+import '../widgets/app_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -26,87 +28,157 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('Tic Tac Toe'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text(
+          'Tic Tac Toe',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // App Icon/Logo
+              const AppLogo(size: 100),
+              const SizedBox(height: 30),
+
               // Welcome message
               Text(
-                playerName.isEmpty ? 'Welcome!' : 'Welcome, $playerName!',
+                playerName.isEmpty
+                    ? 'Welcome to Tic Tac Toe!'
+                    : 'Welcome back, $playerName! 🎮',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
 
               // Name input field (show only if name is empty)
               if (playerName.isEmpty) ...[
-                TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Enter your name',
-                    border: OutlineInputBorder(),
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 300),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: 'Enter your name',
+                          hintText: 'e.g., John',
+                          prefixIcon: const Icon(Icons.person),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                        onSubmitted: (value) {
+                          if (value.trim().isNotEmpty) {
+                            setState(() {
+                              playerName = value.trim();
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          if (_nameController.text.trim().isNotEmpty) {
+                            setState(() {
+                              playerName = _nameController.text.trim();
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.check),
+                        label: const Text('Set Name'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  onSubmitted: (value) {
-                    if (value.isNotEmpty) {
-                      setState(() {
-                        playerName = value;
-                      });
-                    }
-                  },
                 ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () {
-                    if (_nameController.text.isNotEmpty) {
-                      setState(() {
-                        playerName = _nameController.text;
-                      });
-                    }
-                  },
-                  child: const Text('Set Name'),
-                ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 30),
               ],
 
-              // Score display
-              Text('Score: $playerScore', style: const TextStyle(fontSize: 20)),
-              const SizedBox(height: 40),
+              // Score display using our custom widget
+              if (playerName.isNotEmpty) ...[
+                ScoreCard(score: playerScore),
+                const SizedBox(height: 30),
+              ],
 
-              // Start game button
-              ElevatedButton(
-                onPressed: () {
-                  // Navigate to game screen
-                  Navigator.pushNamed(context, '/game');
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 40,
-                    vertical: 15,
+              // Start game button (show only if name is set)
+              if (playerName.isNotEmpty) ...[
+                ElevatedButton.icon(
+                  onPressed: () {
+                    // Navigate to game screen
+                    Navigator.pushNamed(context, '/game');
+                  },
+                  icon: const Icon(Icons.play_arrow, size: 28),
+                  label: const Text(
+                    'Start New Game',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 3,
                   ),
                 ),
-                child: const Text(
-                  'Start New Game',
-                  style: TextStyle(fontSize: 18),
-                ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
-              // History button
-              TextButton(
-                onPressed: () {
-                  // Navigate to history screen
-                  Navigator.pushNamed(context, '/history');
-                },
-                child: const Text('View Game History'),
-              ),
+                // History button
+                OutlinedButton.icon(
+                  onPressed: () {
+                    // Navigate to history screen
+                    Navigator.pushNamed(context, '/history');
+                  },
+                  icon: const Icon(Icons.history),
+                  label: const Text('View Game History'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+
+                // Change name button
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      playerName = '';
+                      _nameController.clear();
+                    });
+                  },
+                  child: const Text('Change Player'),
+                ),
+              ],
             ],
           ),
         ),
