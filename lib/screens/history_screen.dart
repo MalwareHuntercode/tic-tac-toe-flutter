@@ -1,21 +1,79 @@
 // lib/screens/history_screen.dart
 
 import 'package:flutter/material.dart';
+import '../models/game.dart';
+import '../services/storage_service.dart';
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    // TODO: This will be replaced with actual game history from storage
-    final List<Map<String, String>> dummyHistory = [
-      {'date': '25/7/2025 at 14:30', 'result': 'Win'},
-      {'date': '24/7/2025 at 10:15', 'result': 'Loss'},
-      {'date': '23/7/2025 at 18:45', 'result': 'Draw'},
-      {'date': '23/7/2025 at 16:20', 'result': 'Win'},
-      {'date': '22/7/2025 at 20:10', 'result': 'Win'},
-    ];
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
 
+class _HistoryScreenState extends State<HistoryScreen> {
+  List<Game> _gameHistory = [];
+  bool _isLoading = true;
+  Map<String, dynamic> _statistics = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGameHistory();
+  }
+
+  Future<void> _loadGameHistory() async {
+    final history = await StorageService.loadGameHistory();
+
+    // Get current player name for statistics
+    final currentPlayer = await StorageService.loadPlayer();
+    if (currentPlayer != null) {
+      final stats =
+          await StorageService.getPlayerStatistics(currentPlayer.name);
+      setState(() {
+        _gameHistory = history
+            .where((game) => game.playerName == currentPlayer.name)
+            .toList();
+        _statistics = stats;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _gameHistory = history;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _clearHistory() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear History?'),
+        content: const Text(
+            'This will delete all your game history. This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await StorageService.clearGameHistory();
+      _loadGameHistory();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -27,96 +85,180 @@ class HistoryScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         elevation: 0,
-      ),
-      body: dummyHistory.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history, size: 80, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No games played yet!',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Start playing to see your history here',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            )
-          : Column(
-              children: [
-                // Summary card
-                Container(
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        spreadRadius: 1,
-                        blurRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildSummaryItem(
-                        'Total',
-                        dummyHistory.length.toString(),
-                        Colors.blue,
-                      ),
-                      _buildSummaryItem(
-                        'Wins',
-                        dummyHistory
-                            .where((g) => g['result'] == 'Win')
-                            .length
-                            .toString(),
-                        Colors.green,
-                      ),
-                      _buildSummaryItem(
-                        'Losses',
-                        dummyHistory
-                            .where((g) => g['result'] == 'Loss')
-                            .length
-                            .toString(),
-                        Colors.red,
-                      ),
-                      _buildSummaryItem(
-                        'Draws',
-                        dummyHistory
-                            .where((g) => g['result'] == 'Draw')
-                            .length
-                            .toString(),
-                        Colors.orange,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // History list
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: dummyHistory.length,
-                    itemBuilder: (context, index) {
-                      final game = dummyHistory[index];
-                      return _buildHistoryCard(
-                        game,
-                        index,
-                        dummyHistory.length,
-                      );
-                    },
-                  ),
-                ),
-              ],
+        actions: [
+          if (_gameHistory.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _clearHistory,
+              tooltip: 'Clear History',
             ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _gameHistory.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.history,
+                        size: 80,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No games played yet!',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Start playing to see your history here',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
+                    // Summary card with statistics
+                    Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.blue.shade50, Colors.blue.shade100],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            spreadRadius: 1,
+                            blurRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Your Statistics',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildSummaryItem(
+                                'Total',
+                                _statistics['totalGames']?.toString() ?? '0',
+                                Colors.blue,
+                              ),
+                              _buildSummaryItem(
+                                'Wins',
+                                _statistics['wins']?.toString() ?? '0',
+                                Colors.green,
+                              ),
+                              _buildSummaryItem(
+                                'Losses',
+                                _statistics['losses']?.toString() ?? '0',
+                                Colors.red,
+                              ),
+                              _buildSummaryItem(
+                                'Draws',
+                                _statistics['draws']?.toString() ?? '0',
+                                Colors.orange,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Win rate and longest streak
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Column(
+                                children: [
+                                  Text(
+                                    '${_statistics['winRate'] ?? '0.0'}%',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Win Rate',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                height: 40,
+                                width: 1,
+                                color: Colors.grey[300],
+                              ),
+                              Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.local_fire_department,
+                                        color: Colors.orange,
+                                        size: 24,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${_statistics['longestStreak'] ?? 0}',
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.orange,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    'Best Streak',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // History list
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _gameHistory.length,
+                        itemBuilder: (context, index) {
+                          final game = _gameHistory[index];
+                          return _buildHistoryCard(
+                              game, index, _gameHistory.length);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
     );
   }
 
@@ -132,28 +274,21 @@ class HistoryScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[600],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildHistoryCard(
-    Map<String, String> game,
-    int index,
-    int totalGames,
-  ) {
-    final result = game['result']!;
-    final color = result == 'Win'
-        ? Colors.green
-        : result == 'Loss'
-        ? Colors.red
-        : Colors.orange;
-
-    final icon = result == 'Win'
-        ? Icons.emoji_events
-        : result == 'Loss'
-        ? Icons.sentiment_dissatisfied
-        : Icons.handshake;
+  Widget _buildHistoryCard(Game game, int index, int totalGames) {
+    final result = game.result;
+    final color = game.getResultColor();
+    final icon = game.getResultIcon();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -169,8 +304,9 @@ class HistoryScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        childrenPadding: const EdgeInsets.all(16),
         leading: Container(
           width: 48,
           height: 48,
@@ -178,15 +314,25 @@ class HistoryScreen extends StatelessWidget {
             color: color.withOpacity(0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: color, size: 28),
+          child: Icon(
+            icon,
+            color: color,
+            size: 28,
+          ),
         ),
         title: Text(
           'Game #${totalGames - index}',
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
         ),
         subtitle: Text(
-          game['date']!,
-          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+          game.getFormattedDate(),
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 14,
+          ),
         ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -195,15 +341,80 @@ class HistoryScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: color.withOpacity(0.3)),
           ),
-          child: Text(
-            result,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                result.substring(0, 1).toUpperCase() + result.substring(1),
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              if (game.scoreChange != 0) ...[
+                const SizedBox(width: 4),
+                Text(
+                  game.scoreChange > 0
+                      ? '+${game.scoreChange}'
+                      : '${game.scoreChange}',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
+        children: [
+          // Show final board state
+          Container(
+            height: 150,
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 4,
+                    mainAxisSpacing: 4,
+                  ),
+                  itemCount: 9,
+                  itemBuilder: (context, cellIndex) {
+                    final row = cellIndex ~/ 3;
+                    final col = cellIndex % 3;
+                    final value = game.finalBoard[row][col];
+
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Center(
+                        child: Text(
+                          value,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: value == 'X' ? Colors.blue : Colors.red,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
