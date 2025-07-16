@@ -1,6 +1,7 @@
 // lib/screens/game_screen.dart
 
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../widgets/game_board.dart';
 import '../services/game_logic.dart';
 import '../models/game.dart';
@@ -9,11 +10,15 @@ import '../services/storage_service.dart';
 class GameScreen extends StatefulWidget {
   final int currentScore;
   final String playerName;
+  final int winStreak;
+  final bool useTimer;
 
   const GameScreen({
     Key? key,
     required this.currentScore,
     required this.playerName,
+    this.winStreak = 0,
+    this.useTimer = true,
   }) : super(key: key);
 
   @override
@@ -40,10 +45,22 @@ class _GameScreenState extends State<GameScreen> {
   // Hint cell
   List<int>? hintCell;
 
+  // Timer variables
+  Timer? _timer;
+  int _timeRemaining = 30; // 30 seconds per move
+  static const int _timeLimit = 30;
+
   @override
   void initState() {
     super.initState();
     _resetGame();
+    _startTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   void _resetGame() {
@@ -57,12 +74,69 @@ class _GameScreenState extends State<GameScreen> {
       gameStatus = 'playing';
       scoreChange = 0;
       hintCell = null;
+      _timeRemaining = _timeLimit;
     });
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    if (!widget.useTimer || !isPlayerTurn || gameStatus != 'playing') return;
+
+    setState(() {
+      _timeRemaining = _timeLimit;
+    });
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        _timeRemaining--;
+      });
+
+      if (_timeRemaining <= 0) {
+        timer.cancel();
+        _handleTimeout();
+      }
+    });
+  }
+
+  void _stopTimer() {
+    _timer?.cancel();
+  }
+
+  void _handleTimeout() {
+    if (!isPlayerTurn || gameStatus != 'playing') return;
+
+    // Make a random move for the player
+    final emptyCells = GameLogic.getEmptyCells(board);
+    if (emptyCells.isNotEmpty) {
+      final randomIndex = DateTime.now().millisecond % emptyCells.length;
+      final randomCell = emptyCells[randomIndex];
+
+      // Show timeout message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Time\'s up! Random move made.'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.orange,
+        ),
+      );
+
+      // Make the move
+      _handleCellTap(randomCell[0], randomCell[1]);
+    }
   }
 
   void _handleCellTap(int row, int col) {
     // Only process if game is still playing
     if (gameStatus != 'playing') return;
+
+    // Stop the timer
+    _stopTimer();
 
     // Make player move
     setState(() {
@@ -91,7 +165,10 @@ class _GameScreenState extends State<GameScreen> {
       });
 
       // Check if app won
-      _checkGameEnd();
+      if (!_checkGameEnd()) {
+        // Restart timer for player's next turn
+        _startTimer();
+      }
     }
   }
 
@@ -104,6 +181,7 @@ class _GameScreenState extends State<GameScreen> {
         // Update score change
         scoreChange = winner == 'X' ? 10 : -10;
       });
+      _stopTimer();
       _saveGameResult();
       _showGameEndDialog();
       return true;
@@ -115,6 +193,7 @@ class _GameScreenState extends State<GameScreen> {
         gameStatus = 'draw';
         scoreChange = 0; // No score change for draw
       });
+      _stopTimer();
       _saveGameResult();
       _showGameEndDialog();
       return true;
@@ -219,6 +298,23 @@ class _GameScreenState extends State<GameScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                if (gameStatus == 'win' && widget.winStreak > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '🔥 Win Streak: ${widget.winStreak + 1}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ] else if (gameStatus == 'loss' && widget.winStreak > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '💔 Win streak of ${widget.winStreak} ended',
+                    style: TextStyle(fontSize: 16, color: Colors.red.shade700),
+                  ),
+                ],
               ],
             ),
             actions: [
@@ -232,8 +328,10 @@ class _GameScreenState extends State<GameScreen> {
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  // Return score change to home screen
-                  Navigator.of(context).pop(scoreChange);
+                  // Return score change and game result to home screen
+                  Navigator.of(
+                    context,
+                  ).pop({'scoreChange': scoreChange, 'gameResult': gameStatus});
                 },
                 child: const Text('Back to Home'),
               ),
@@ -248,9 +346,11 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        // If game ended, return score change
+        // If game ended, return score change and result
         if (gameStatus != 'playing') {
-          Navigator.of(context).pop(scoreChange);
+          Navigator.of(
+            context,
+          ).pop({'scoreChange': scoreChange, 'gameResult': gameStatus});
           return false;
         }
         return true;
@@ -339,10 +439,119 @@ class _GameScreenState extends State<GameScreen> {
                         'Current Score: ${widget.currentScore}',
                         style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                       ),
+                      // Win streak display
+                      if (widget.winStreak > 0) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.local_fire_department,
+                              color: Colors.orange,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Streak: ${widget.winStreak}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.orange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
+
+                // Timer display
+                if (widget.useTimer && isPlayerTurn && gameStatus == 'playing')
+                  Container(
+                    margin: const EdgeInsets.only(top: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _timeRemaining <= 10
+                          ? Colors.red.shade50
+                          : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _timeRemaining <= 10 ? Colors.red : Colors.blue,
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.timer,
+                          color: _timeRemaining <= 10
+                              ? Colors.red
+                              : Colors.blue,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Time: $_timeRemaining seconds',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _timeRemaining <= 10
+                                ? Colors.red
+                                : Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Animated timer bar
+                        SizedBox(
+                          width: 100,
+                          height: 8,
+                          child: LinearProgressIndicator(
+                            value: _timeRemaining / _timeLimit,
+                            backgroundColor: Colors.grey.shade300,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _timeRemaining <= 10 ? Colors.red : Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 40),
+
+                // Win streak risk indicator
+                if (widget.winStreak >= 3 && gameStatus == 'playing')
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.yellow.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.yellow.shade700,
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.warning,
+                          color: Colors.yellow.shade700,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Win streak at risk! Don\'t lose now!',
+                          style: TextStyle(
+                            color: Colors.yellow.shade900,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                 // Game board
                 Expanded(

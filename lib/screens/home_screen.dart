@@ -15,6 +15,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // This will hold our player name and score
   String playerName = '';
   int playerScore = 0;
+  int winStreak = 0;
+  bool useTimer = true; // Timer setting
 
   // Controller for the text field
   final TextEditingController _nameController = TextEditingController();
@@ -119,6 +121,60 @@ class _HomeScreenState extends State<HomeScreen> {
               // Score display using our custom widget
               if (playerName.isNotEmpty) ...[
                 ScoreCard(score: playerScore),
+                const SizedBox(height: 16),
+
+                // Win streak display
+                if (winStreak > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.orange.shade400,
+                          Colors.orange.shade600,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(25),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.3),
+                          spreadRadius: 2,
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.local_fire_department,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Win Streak: $winStreak',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.local_fire_department,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 30),
               ],
 
@@ -133,12 +189,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       arguments: {
                         'score': playerScore,
                         'playerName': playerName,
+                        'winStreak': winStreak,
+                        'useTimer': useTimer,
                       },
                     ).then((result) {
-                      // Update score when returning from game
-                      if (result != null && result is int) {
+                      // Update score and streak when returning from game
+                      if (result != null && result is Map<String, dynamic>) {
                         setState(() {
-                          playerScore += result;
+                          // Ensure scoreChange is treated as int
+                          final scoreChange =
+                              result['scoreChange'] as int? ?? 0;
+                          playerScore += scoreChange;
+
+                          // Update win streak
+                          if (result['gameResult'] == 'win') {
+                            winStreak++;
+                          } else if (result['gameResult'] == 'loss') {
+                            winStreak = 0; // Reset streak on loss
+                          }
+                          // Draw doesn't affect streak
                         });
                       }
                     });
@@ -181,12 +250,44 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 20),
+
+                // Timer toggle
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.timer, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      const Text('30s Timer'),
+                      const SizedBox(width: 8),
+                      Switch(
+                        value: useTimer,
+                        onChanged: (value) {
+                          setState(() {
+                            useTimer = value;
+                          });
+                        },
+                        activeColor: Colors.blue,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
 
                 // Change name button
                 TextButton(
                   onPressed: () {
                     setState(() {
                       playerName = '';
+                      playerScore = 0;
+                      winStreak = 0;
                       _nameController.clear();
                     });
                   },
