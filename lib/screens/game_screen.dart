@@ -3,9 +3,18 @@
 import 'package:flutter/material.dart';
 import '../widgets/game_board.dart';
 import '../services/game_logic.dart';
+import '../models/game.dart';
+import '../services/storage_service.dart';
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({Key? key}) : super(key: key);
+  final int currentScore;
+  final String playerName;
+
+  const GameScreen({
+    Key? key,
+    required this.currentScore,
+    required this.playerName,
+  }) : super(key: key);
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -25,6 +34,12 @@ class _GameScreenState extends State<GameScreen> {
   // Game state
   String gameStatus = 'playing'; // 'playing', 'win', 'loss', 'draw'
 
+  // Score change for this game
+  int scoreChange = 0;
+
+  // Hint cell
+  List<int>? hintCell;
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +55,8 @@ class _GameScreenState extends State<GameScreen> {
       ];
       isPlayerTurn = true;
       gameStatus = 'playing';
+      scoreChange = 0;
+      hintCell = null;
     });
   }
 
@@ -84,7 +101,10 @@ class _GameScreenState extends State<GameScreen> {
     if (winner.isNotEmpty) {
       setState(() {
         gameStatus = winner == 'X' ? 'win' : 'loss';
+        // Update score change
+        scoreChange = winner == 'X' ? 10 : -10;
       });
+      _saveGameResult();
       _showGameEndDialog();
       return true;
     }
@@ -93,12 +113,56 @@ class _GameScreenState extends State<GameScreen> {
     if (GameLogic.isBoardFull(board)) {
       setState(() {
         gameStatus = 'draw';
+        scoreChange = 0; // No score change for draw
       });
+      _saveGameResult();
       _showGameEndDialog();
       return true;
     }
 
     return false;
+  }
+
+  void _saveGameResult() {
+    final game = Game(
+      timestamp: DateTime.now(),
+      result: gameStatus,
+      finalBoard: board.map((row) => List<String>.from(row)).toList(),
+      playerName: widget.playerName,
+      scoreChange: scoreChange,
+    );
+
+    // Save game to storage (we'll implement actual storage in Phase 5)
+    StorageService.saveGame(game);
+  }
+
+  void _showHint() {
+    final hint = GameLogic.getHint(board);
+    if (hint != null) {
+      setState(() {
+        hintCell = hint;
+      });
+
+      // Remove hint after 2 seconds
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            hintCell = null;
+          });
+        }
+      });
+
+      // Show hint message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Try cell at row ${hint[0] + 1}, column ${hint[1] + 1}',
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    }
   }
 
   void _showGameEndDialog() {
@@ -110,19 +174,19 @@ class _GameScreenState extends State<GameScreen> {
     switch (gameStatus) {
       case 'win':
         title = 'Congratulations! 🎉';
-        message = 'You won the game!';
+        message = 'You won! +10 points';
         icon = Icons.emoji_events;
         color = Colors.green;
         break;
       case 'loss':
         title = 'Game Over 😔';
-        message = 'Better luck next time!';
+        message = 'You lost! -10 points';
         icon = Icons.sentiment_dissatisfied;
         color = Colors.red;
         break;
       case 'draw':
         title = 'It\'s a Draw! 🤝';
-        message = 'Good game!';
+        message = 'No points change';
         icon = Icons.handshake;
         color = Colors.orange;
         break;
@@ -140,10 +204,23 @@ class _GameScreenState extends State<GameScreen> {
               children: [
                 Icon(icon, color: color, size: 32),
                 const SizedBox(width: 8),
-                Text(title),
+                Expanded(child: Text(title)),
               ],
             ),
-            content: Text(message),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(message),
+                const SizedBox(height: 16),
+                Text(
+                  'New Score: ${widget.currentScore + scoreChange}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
             actions: [
               TextButton(
                 onPressed: () {
@@ -155,7 +232,8 @@ class _GameScreenState extends State<GameScreen> {
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  Navigator.of(context).pop();
+                  // Return score change to home screen
+                  Navigator.of(context).pop(scoreChange);
                 },
                 child: const Text('Back to Home'),
               ),
@@ -168,106 +246,130 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text(
-          'Play Game',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _resetGame,
-            tooltip: 'Reset Game',
+    return WillPopScope(
+      onWillPop: () async {
+        // If game ended, return score change
+        if (gameStatus != 'playing') {
+          Navigator.of(context).pop(scoreChange);
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[100],
+        appBar: AppBar(
+          title: const Text(
+            'Play Game',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              // Game status card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      spreadRadius: 1,
-                      blurRadius: 5,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Turn indicator
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          gameStatus == 'playing'
-                              ? (isPlayerTurn ? Icons.person : Icons.computer)
-                              : Icons.flag,
-                          color: gameStatus == 'playing'
-                              ? (isPlayerTurn ? Colors.blue : Colors.red)
-                              : Colors.grey,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          gameStatus == 'playing'
-                              ? (isPlayerTurn
-                                    ? 'Your Turn (X)'
-                                    : 'App\'s Turn (O)')
-                              : 'Game Over',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (!isPlayerTurn && gameStatus == 'playing') ...[
-                      const SizedBox(height: 8),
-                      const LinearProgressIndicator(),
+          centerTitle: true,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.lightbulb_outline),
+              onPressed: isPlayerTurn && gameStatus == 'playing'
+                  ? _showHint
+                  : null,
+              tooltip: 'Get Hint',
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _resetGame,
+              tooltip: 'Reset Game',
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              children: [
+                // Game status card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        spreadRadius: 1,
+                        blurRadius: 5,
+                      ),
                     ],
-                  ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Turn indicator
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            gameStatus == 'playing'
+                                ? (isPlayerTurn ? Icons.person : Icons.computer)
+                                : Icons.flag,
+                            color: gameStatus == 'playing'
+                                ? (isPlayerTurn ? Colors.blue : Colors.red)
+                                : Colors.grey,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            gameStatus == 'playing'
+                                ? (isPlayerTurn
+                                      ? 'Your Turn (X)'
+                                      : 'App\'s Turn (O)')
+                                : 'Game Over',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (!isPlayerTurn && gameStatus == 'playing') ...[
+                        const SizedBox(height: 8),
+                        const LinearProgressIndicator(),
+                      ],
+                      const SizedBox(height: 8),
+                      // Current score display
+                      Text(
+                        'Current Score: ${widget.currentScore}',
+                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 40),
+                const SizedBox(height: 40),
 
-              // Game board
-              Expanded(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 400),
-                    child: GameBoard(
-                      board: board,
-                      onCellTap: _handleCellTap,
-                      isPlayerTurn: isPlayerTurn,
+                // Game board
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 400),
+                      child: GameBoard(
+                        board: board,
+                        onCellTap: _handleCellTap,
+                        isPlayerTurn: isPlayerTurn,
+                        hintCell: hintCell,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 40),
+                const SizedBox(height: 40),
 
-              // Quick stats
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildStatCard('You', 'X', Colors.blue),
-                  _buildStatCard('App', 'O', Colors.red),
-                ],
-              ),
-            ],
+                // Quick stats
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildStatCard(widget.playerName, 'X', Colors.blue),
+                    _buildStatCard('App', 'O', Colors.red),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

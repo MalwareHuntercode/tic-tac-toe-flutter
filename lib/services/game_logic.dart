@@ -4,71 +4,167 @@ import 'dart:math';
 
 /// This class handles all game logic
 class GameLogic {
+  // All possible winning combinations
+  static const List<List<int>> winningCombinations = [
+    // Rows
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    // Columns
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8],
+    // Diagonals
+    [0, 4, 8],
+    [2, 4, 6],
+  ];
+
   // Check if someone won
   static String checkWinner(List<List<String>> board) {
-    // Check rows
-    for (int i = 0; i < 3; i++) {
-      if (board[i][0] != '' &&
-          board[i][0] == board[i][1] &&
-          board[i][1] == board[i][2]) {
-        return board[i][0]; // Return 'X' or 'O'
+    // Flatten the board for easier checking
+    final flatBoard = board.expand((row) => row).toList();
+
+    // Check each winning combination
+    for (final combination in winningCombinations) {
+      final a = flatBoard[combination[0]];
+      final b = flatBoard[combination[1]];
+      final c = flatBoard[combination[2]];
+
+      // If all three positions have the same non-empty value
+      if (a.isNotEmpty && a == b && b == c) {
+        return a; // Return 'X' or 'O'
       }
     }
 
-    // Check columns
-    for (int i = 0; i < 3; i++) {
-      if (board[0][i] != '' &&
-          board[0][i] == board[1][i] &&
-          board[1][i] == board[2][i]) {
-        return board[0][i]; // Return 'X' or 'O'
-      }
-    }
-
-    // Check diagonals
-    if (board[0][0] != '' &&
-        board[0][0] == board[1][1] &&
-        board[1][1] == board[2][2]) {
-      return board[0][0];
-    }
-
-    if (board[0][2] != '' &&
-        board[0][2] == board[1][1] &&
-        board[1][1] == board[2][0]) {
-      return board[0][2];
-    }
-
-    // No winner
-    return '';
+    return ''; // No winner
   }
 
   // Check if board is full (draw)
   static bool isBoardFull(List<List<String>> board) {
     for (var row in board) {
       for (var cell in row) {
-        if (cell == '') return false;
+        if (cell.isEmpty) return false;
       }
     }
     return true;
   }
 
-  // Make app's move (random strategy)
-  static List<int>? makeAppMove(List<List<String>> board) {
+  // Get all empty cells
+  static List<List<int>> getEmptyCells(List<List<String>> board) {
     List<List<int>> emptyCells = [];
 
-    // Find all empty cells
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
-        if (board[i][j] == '') {
+        if (board[i][j].isEmpty) {
           emptyCells.add([i, j]);
         }
       }
     }
 
+    return emptyCells;
+  }
+
+  // Make app's move (with difficulty levels)
+  static List<int>? makeAppMove(
+    List<List<String>> board, {
+    String difficulty = 'medium',
+  }) {
+    final emptyCells = getEmptyCells(board);
+
     // If no empty cells, return null
     if (emptyCells.isEmpty) return null;
 
-    // Pick a random empty cell
     final random = Random();
+
+    // Easy mode: completely random
+    if (difficulty == 'easy') {
+      return emptyCells[random.nextInt(emptyCells.length)];
+    }
+
+    // Medium mode: 70% smart moves, 30% random
+    if (difficulty == 'medium') {
+      if (random.nextDouble() < 0.3) {
+        return emptyCells[random.nextInt(emptyCells.length)];
+      }
+    }
+
+    // Hard mode (and fallback for medium): always play optimally
+
+    // Try to win first
+    final winningMove = _findWinningMove(board, 'O');
+    if (winningMove != null) return winningMove;
+
+    // Try to block player from winning
+    final blockingMove = _findWinningMove(board, 'X');
+    if (blockingMove != null) return blockingMove;
+
+    // Try to take center
+    if (board[1][1].isEmpty) return [1, 1];
+
+    // Try to take corners
+    final corners = [
+      [0, 0],
+      [0, 2],
+      [2, 0],
+      [2, 2],
+    ];
+    final emptyCorners = corners
+        .where((corner) => board[corner[0]][corner[1]].isEmpty)
+        .toList();
+
+    if (emptyCorners.isNotEmpty) {
+      return emptyCorners[random.nextInt(emptyCorners.length)];
+    }
+
+    // Take any empty cell
     return emptyCells[random.nextInt(emptyCells.length)];
+  }
+
+  // Find a winning move for the given player
+  static List<int>? _findWinningMove(List<List<String>> board, String player) {
+    final emptyCells = getEmptyCells(board);
+
+    // Try each empty cell
+    for (final cell in emptyCells) {
+      // Make a copy of the board
+      final testBoard = board.map((row) => List<String>.from(row)).toList();
+
+      // Try the move
+      testBoard[cell[0]][cell[1]] = player;
+
+      // Check if this move wins
+      if (checkWinner(testBoard) == player) {
+        return cell;
+      }
+    }
+
+    return null;
+  }
+
+  // Get a hint for the player
+  static List<int>? getHint(List<List<String>> board) {
+    // First check if player can win
+    final winningMove = _findWinningMove(board, 'X');
+    if (winningMove != null) return winningMove;
+
+    // Then check if need to block opponent
+    final blockingMove = _findWinningMove(board, 'O');
+    if (blockingMove != null) return blockingMove;
+
+    // Otherwise suggest center or corner
+    if (board[1][1].isEmpty) return [1, 1];
+
+    final corners = [
+      [0, 0],
+      [0, 2],
+      [2, 0],
+      [2, 2],
+    ];
+    for (final corner in corners) {
+      if (board[corner[0]][corner[1]].isEmpty) return corner;
+    }
+
+    // Return any empty cell
+    return getEmptyCells(board).firstOrNull;
   }
 }

@@ -71,11 +71,26 @@ class TicTacToeApp extends StatelessWidget {
         ),
       ),
 
-      // Define named routes for navigation
-      routes: {
-        '/': (context) => const HomeScreen(), // Default route
-        '/game': (context) => const GameScreen(), // Game screen route
-        '/history': (context) => const HistoryScreen(), // History screen route
+      // Use onGenerateRoute instead of routes for passing arguments
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(builder: (context) => const HomeScreen());
+          case '/game':
+            final args = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (context) => GameScreen(
+                currentScore: args['score'] ?? 0,
+                playerName: args['playerName'] ?? 'Player',
+              ),
+            );
+          case '/history':
+            return MaterialPageRoute(
+              builder: (context) => const HistoryScreen(),
+            );
+          default:
+            return MaterialPageRoute(builder: (context) => const HomeScreen());
+        }
       },
       initialRoute: '/', // Start with home screen
     );

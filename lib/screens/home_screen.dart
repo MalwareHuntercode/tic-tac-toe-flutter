@@ -126,8 +126,22 @@ class _HomeScreenState extends State<HomeScreen> {
               if (playerName.isNotEmpty) ...[
                 ElevatedButton.icon(
                   onPressed: () {
-                    // Navigate to game screen
-                    Navigator.pushNamed(context, '/game');
+                    // Navigate to game screen with current score and name
+                    Navigator.pushNamed(
+                      context,
+                      '/game',
+                      arguments: {
+                        'score': playerScore,
+                        'playerName': playerName,
+                      },
+                    ).then((result) {
+                      // Update score when returning from game
+                      if (result != null && result is int) {
+                        setState(() {
+                          playerScore += result;
+                        });
+                      }
+                    });
                   },
                   icon: const Icon(Icons.play_arrow, size: 28),
                   label: const Text(
