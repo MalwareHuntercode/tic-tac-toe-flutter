@@ -6,6 +6,8 @@ class Player {
   int score;
   int winStreak;
   DateTime lastPlayed;
+  int currentLevel;
+  int totalGamesPlayed;
 
   // Constructor - creates a new player
   Player({
@@ -13,12 +15,15 @@ class Player {
     this.score = 0,
     this.winStreak = 0,
     DateTime? lastPlayed,
+    this.currentLevel = 1,
+    this.totalGamesPlayed = 0,
   }) : lastPlayed = lastPlayed ?? DateTime.now();
 
   // Add points to score
   void addScore(int points) {
     score += points;
     lastPlayed = DateTime.now();
+    totalGamesPlayed++;
   }
 
   // Update win streak
@@ -32,6 +37,13 @@ class Player {
     lastPlayed = DateTime.now();
   }
 
+  // Update level based on score
+  void updateLevel(int newLevel) {
+    if (newLevel > currentLevel) {
+      currentLevel = newLevel;
+    }
+  }
+
   // Convert player to Map for storage
   Map<String, dynamic> toMap() {
     return {
@@ -39,6 +51,8 @@ class Player {
       'score': score,
       'winStreak': winStreak,
       'lastPlayed': lastPlayed.toIso8601String(),
+      'currentLevel': currentLevel,
+      'totalGamesPlayed': totalGamesPlayed,
     };
   }
 
@@ -51,6 +65,8 @@ class Player {
       lastPlayed: map['lastPlayed'] != null
           ? DateTime.parse(map['lastPlayed'])
           : DateTime.now(),
+      currentLevel: map['currentLevel'] ?? 1,
+      totalGamesPlayed: map['totalGamesPlayed'] ?? 0,
     );
   }
 }

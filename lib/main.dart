@@ -1,10 +1,12 @@
 // lib/main.dart
 
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+import 'screens/cyberpunk_home_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/statistics_screen.dart';
+import 'screens/cyberpunk_home_screen.dart';
+import 'screens/cyberpunk_game_screen.dart';
 
 void main() {
   runApp(const TicTacToeApp());
@@ -88,7 +90,8 @@ class TicTacToeApp extends StatelessWidget {
         switch (settings.name) {
           case '/':
             return MaterialPageRoute(
-              builder: (context) => const HomeScreen(),
+              builder: (context) =>
+                  const CyberpunkHomeScreen(), // Use cyberpunk home
             );
           case '/game':
             final args = settings.arguments as Map<String, dynamic>;
@@ -98,6 +101,17 @@ class TicTacToeApp extends StatelessWidget {
                 playerName: args['playerName'] ?? 'Player',
                 winStreak: args['winStreak'] ?? 0,
                 useTimer: args['useTimer'] ?? true,
+              ),
+            );
+          case '/cyberpunk-game':
+            final args = settings.arguments as Map<String, dynamic>;
+            return MaterialPageRoute(
+              builder: (context) => CyberpunkGameScreen(
+                currentScore: args['score'] ?? 0,
+                playerName: args['playerName'] ?? 'Player',
+                winStreak: args['winStreak'] ?? 0,
+                useTimer: args['useTimer'] ?? true,
+                currentLevel: args['currentLevel'] ?? 1,
               ),
             );
           case '/history':
@@ -110,7 +124,7 @@ class TicTacToeApp extends StatelessWidget {
             );
           default:
             return MaterialPageRoute(
-              builder: (context) => const HomeScreen(),
+              builder: (context) => const CyberpunkHomeScreen(),
             );
         }
       },
