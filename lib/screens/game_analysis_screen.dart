@@ -190,11 +190,12 @@ class _GameAnalysisScreenState extends State<GameAnalysisScreen>
 
               // Game Board
               Expanded(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: CyberpunkGameBoard(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      // Game Board
+                      CyberpunkGameBoard(
                         board: _displayBoard,
                         onCellTap: (_, __) {}, // Non-interactive
                         isPlayerTurn: false,
@@ -210,98 +211,102 @@ class _GameAnalysisScreenState extends State<GameAnalysisScreen>
                               ]
                             : null,
                       ),
-                    ),
 
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
-                    // Move Navigation
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            icon:
-                                Icon(Icons.skip_previous, color: theme.primary),
-                            onPressed: _currentMoveIndex > 0
-                                ? () =>
-                                    _updateBoardToMove(_currentMoveIndex - 1)
-                                : null,
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: theme.surface,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: theme.primary),
-                            ),
-                            child: Text(
-                              'Move ${_currentMoveIndex + 1} / ${widget.moveHistory.length}',
-                              style: TextStyle(color: theme.primary),
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.skip_next, color: theme.primary),
-                            onPressed: _currentMoveIndex <
-                                    widget.moveHistory.length - 1
-                                ? () =>
-                                    _updateBoardToMove(_currentMoveIndex + 1)
-                                : null,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Move Analysis
-                    if (currentAnalysis != null)
+                      // Move Navigation
                       Container(
-                        margin: const EdgeInsets.all(16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _getMoveQualityColor(currentAnalysis.quality)
-                              .withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color:
-                                _getMoveQualityColor(currentAnalysis.quality),
-                            width: 2,
-                          ),
-                        ),
-                        child: Column(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _getMoveQualityIcon(currentAnalysis.quality),
-                                  color: _getMoveQualityColor(
-                                      currentAnalysis.quality),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _getMoveQualityText(currentAnalysis.quality),
-                                  style: TextStyle(
-                                    color: _getMoveQualityColor(
-                                        currentAnalysis.quality),
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                            IconButton(
+                              icon: Icon(Icons.skip_previous,
+                                  color: theme.primary),
+                              onPressed: _currentMoveIndex > 0
+                                  ? () =>
+                                      _updateBoardToMove(_currentMoveIndex - 1)
+                                  : null,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              currentAnalysis.explanation,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: theme.primary.withOpacity(0.8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: theme.surface,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: theme.primary),
                               ),
+                              child: Text(
+                                'Move ${_currentMoveIndex + 1} / ${widget.moveHistory.length}',
+                                style: TextStyle(color: theme.primary),
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.skip_next, color: theme.primary),
+                              onPressed: _currentMoveIndex <
+                                      widget.moveHistory.length - 1
+                                  ? () =>
+                                      _updateBoardToMove(_currentMoveIndex + 1)
+                                  : null,
                             ),
                           ],
                         ),
                       ),
-                  ],
+
+                      // Move Analysis
+                      if (currentAnalysis != null)
+                        Container(
+                          margin: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: _getMoveQualityColor(currentAnalysis.quality)
+                                .withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color:
+                                  _getMoveQualityColor(currentAnalysis.quality),
+                              width: 2,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _getMoveQualityIcon(
+                                        currentAnalysis.quality),
+                                    color: _getMoveQualityColor(
+                                        currentAnalysis.quality),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _getMoveQualityText(
+                                        currentAnalysis.quality),
+                                    style: TextStyle(
+                                      color: _getMoveQualityColor(
+                                          currentAnalysis.quality),
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                currentAnalysis.explanation,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: theme.primary.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      const SizedBox(height: 16), // Add some bottom padding
+                    ],
+                  ),
                 ),
               ),
 
