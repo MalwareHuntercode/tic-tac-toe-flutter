@@ -32,7 +32,7 @@ Cyberpunk Tic Tac Toe reimagines the classic game with a futuristic twist. Battl
 *Level 1: Neon Rookie - Blue neon theme*
 
 ![Level 4 - System Overide](screenshots/level_4_game.png)
-*Level 3: Matrix Master - Green matrix theme*
+*Level 3: Matrix Master - Red matrix theme*
 
 ### Game Analysis
 ![Game Analysis](screenshots/game_analysis.png)
